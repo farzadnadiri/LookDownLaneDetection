@@ -1,0 +1,21 @@
+# Ignore specific JSON files
+lane.json
+road.json
+pyvenv.cfg
+# Ignore the __pycache__ folder
+__pycache__/
+
+# Ignore the .git folder (typically unnecessary, as .git is already ignored by Git)
+.git/
+
+# Ignore the include folder
+include/
+
+# Ignore the Lib folder
+Lib/
+
+# Ignore the Scripts folder
+Scripts/
+
+# Ignore the Share folder
+Share/
