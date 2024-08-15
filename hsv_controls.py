@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import json
+import numpy as np
 
 # Trackbar and value variables
 h_min_value = None
@@ -115,3 +116,17 @@ def reset_hsv_values(log_func):
     v_min_trackbar.set(0)
     v_max_trackbar.set(255)
     log_func("HSV values reset to default.")
+
+def get_hsv_min_values():
+    # Convert the string values to float, then to int, and finally to uint8
+    h_min = int(float(h_min_value.get()))
+    s_min = int(float(s_min_value.get()))
+    v_min = int(float(v_min_value.get()))
+    return np.array([h_min, s_min, v_min], dtype=np.uint8)
+
+def get_hsv_max_values():
+    # Convert the string values to float, then to int, and finally to uint8
+    h_max = int(float(h_max_value.get()))
+    s_max = int(float(s_max_value.get()))
+    v_max = int(float(v_max_value.get()))
+    return np.array([h_max, s_max, v_max], dtype=np.uint8)
