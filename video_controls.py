@@ -30,8 +30,10 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
         processed_frame4, distance = process_detected_lines_and_distance(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size)
    
         if distance_label:
-            distance_label.config(text=f"Distance to lane: {distance} px")
-
+            if distance is not None:
+                distance_label.config(text=f"Distance to lane: {int(distance)} px")
+            else:
+                distance_label.config(text="Distance to lane: N/A")
         # Display each processed frame in the corresponding label
         display_frame(frame1, processed_frame1)
         display_frame(frame2, processed_frame2)
