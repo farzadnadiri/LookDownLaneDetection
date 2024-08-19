@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 import cv2
-from hsv_controls import create_hsv_controls, save_hsv_values, load_hsv_values, reset_hsv_values, get_hsv_min_values, get_hsv_max_values
+from hsv_controls import create_hsv_controls, save_hsv_values, load_hsv_values, reset_hsv_values, get_hsv_min_values, get_hsv_max_values, get_erode_size, get_dilate_size
 from video_controls import update_all_frames
 
 def log_message(textbox, message):
@@ -72,7 +72,7 @@ reset_button.place(x=600, y=460, width=100, height=30)
 
 # Function to repeatedly call update_all_frames
 def schedule_update():
-    update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_label, get_hsv_min_values(), get_hsv_max_values())
+    update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_label, get_hsv_min_values(), get_hsv_max_values(), get_erode_size(), get_dilate_size())
     window.after(10, schedule_update)
 
 # Start the initial frame update and schedule recurring updates
