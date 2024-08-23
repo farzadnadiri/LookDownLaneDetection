@@ -7,21 +7,19 @@ def process_original_frame(frame, log_func):
 
 def process_frame_with_convex_hull(frame, log_func):
     # log_func("Processing frame with convex hull")
-    cleaned_frame = remove_right_side(frame, exclude_percentage=25)
+    cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
 
     return cleaned_frame
 
 def process_frame_with_masked_lines(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size):
-    cleaned_frame = remove_right_side(frame, exclude_percentage=25)
+    cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
     return process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
 
-
 def process_detected_lines_and_distance(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size):
-    cleaned_frame = remove_right_side(frame, exclude_percentage=25)
+    cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
     mask = process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
-    lines, distance = detect_vertical_lanes(mask, frame)
+    lines, distance = detect_horizontal_lanes(mask, frame)  # Detect horizontal lanes
     return lines, distance
-
 
 def process_frame_with_mask(frame, log_func, lowerb, upperb, erode_kernel_size=5, dilate_kernel_size=5):
     # Convert frame to HSV color space
@@ -43,19 +41,19 @@ def process_frame_with_mask(frame, log_func, lowerb, upperb, erode_kernel_size=5
     
     return binary_frame
 
-def detect_vertical_lanes(binary_frame, line_image):
+def detect_horizontal_lanes(binary_frame, line_image):
     # Apply Canny edge detection
     edges = cv2.Canny(binary_frame, 50, 150, apertureSize=3)
 
     # Use Hough Line Transform to detect lines
     lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold=150)
 
-    distances_to_right = []
+    distances_to_bottom = []
 
     if lines is not None:
         for rho, theta in lines[:, 0]:
-            # Only consider vertical lines (theta close to 0 or pi)
-            if np.abs(theta) < np.pi / 18 or np.abs(theta - np.pi) < np.pi / 18:
+            # Only consider horizontal lines (theta close to π/2 or 3π/2)
+            if (np.pi / 2 - np.pi / 18) < theta < (np.pi / 2 + np.pi / 18) or (3 * np.pi / 2 - np.pi / 18) < theta < (3 * np.pi / 2 + np.pi / 18):
                 # Calculate the coordinates for the line
                 a = np.cos(theta)
                 b = np.sin(theta)
@@ -69,27 +67,30 @@ def detect_vertical_lanes(binary_frame, line_image):
                 # Draw the line on the image
                 cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-                # Calculate the horizontal distance from the line to the right side of the frame
-                frame_width = binary_frame.shape[1]
+                # Calculate the vertical distance from the line to the bottom of the frame
+                frame_height = binary_frame.shape[0]
 
-                # Choose one x-coordinate (x1 or x2) to calculate distance
-                distance_to_right = frame_width - max(x1, x2)
-                distances_to_right.append(distance_to_right)
+                # Choose one y-coordinate (y1 or y2) to calculate distance
+                distance_to_bottom = frame_height - max(y1, y2)
+                distances_to_bottom.append(distance_to_bottom)
 
     # Calculate the average distance if any lines were detected
-    average_distance = np.mean(distances_to_right) if distances_to_right else None
+    average_distance = np.mean(distances_to_bottom) if distances_to_bottom else None
     return line_image, average_distance
 
-def remove_right_side(frame, exclude_percentage=20):
+def remove_car(frame, exclude_percentage=20):
+    """
+    Remove the bottom portion of the frame to exclude the car.
+    """
     # Get the frame dimensions
     height, width = frame.shape[:2]
 
-    # Calculate the width of the area to exclude
-    exclude_width = int(width * exclude_percentage / 100)
+    # Calculate the height of the area to exclude
+    exclude_height = int(height * exclude_percentage / 100)
 
-    # Create a mask to exclude the right side of the frame
+    # Create a mask to exclude the bottom of the frame
     mask = np.zeros_like(frame, dtype=np.uint8)
-    mask[:, :width-exclude_width] = 255  # Keep only the left part of the image
+    mask[:height-exclude_height, :] = 255  # Keep only the upper part of the image
 
     # Apply the mask to the frame
     masked_frame = cv2.bitwise_and(frame, mask)

@@ -8,7 +8,7 @@ from video_processing import (
     process_detected_lines_and_distance
 )
 
-def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_label=None, lower_b=None, upper_b=None, erode_size=None, dilate_size=None):
+def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_label=None, lower_b=None, upper_b=None, erode_size=None, dilate_size=None, side=""):
     ret, frame = cap.read()
     if not ret:
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Restart the video from the first frame
@@ -31,16 +31,16 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
    
         if distance_label:
             if distance is not None:
-                distance_label.config(text=f"Distance to lane: {int(distance)} px")
+                distance_label.config(text=f"Distance to lane ({side}): {int(distance)} px")
             else:
-                distance_label.config(text="Distance to lane: N/A")
+                distance_label.config(text="Distance to lane ({side}): N/A")
+        
         # Display each processed frame in the corresponding label
         display_frame(frame1, processed_frame1)
         display_frame(frame2, processed_frame2)
         display_frame(frame3, processed_frame3)
         display_frame(frame4, processed_frame4)
 
-    
 def display_frame(label, frame):
     frame = cv2.resize(frame, (320, 240))
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
