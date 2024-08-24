@@ -8,7 +8,7 @@ from video_processing import (
     process_detected_lines_and_distance
 )
 
-def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_label=None, lower_b=None, upper_b=None, erode_size=None, dilate_size=None, side=""):
+def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_label=None, lower_b=None, upper_b=None, erode_size=None, dilate_size=None, side="", algorithm="hough"):
     ret, frame = cap.read()
     if not ret:
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Restart the video from the first frame
@@ -27,7 +27,7 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
         processed_frame1 = process_original_frame(frame.copy(), log_func)
         processed_frame2 = process_frame_with_convex_hull(frame.copy(), log_func)
         processed_frame3 = process_frame_with_masked_lines(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size)
-        processed_frame4, distance = process_detected_lines_and_distance(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size)
+        processed_frame4, distance = process_detected_lines_and_distance(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size,algorithm)
    
         if distance_label:
             if distance is not None:

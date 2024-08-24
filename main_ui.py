@@ -45,9 +45,20 @@ right_frame4, right_label4 = create_frame_and_label(1030, 300, "Detected Lines (
 distance_label_left = ttk.Label(window, text="Distance to lane (Left): ")
 distance_label_left.place(x=10, y=580, width=300, height=20)
 
+alg_selection_left = tk.StringVar(value="hough")
+left_hough_radio = ttk.Radiobutton(window, text="hough transform", variable=alg_selection_left, value="hough")
+left_hough_radio.place(x=250, y=580)
+left_sliding_radio = ttk.Radiobutton(window, text="sliding window", variable=alg_selection_left, value="sliding")
+left_sliding_radio.place(x=400, y=580)
+
 distance_label_right = ttk.Label(window, text="Distance to lane (Right): ")
 distance_label_right.place(x=700, y=580, width=300, height=20)
 
+alg_selection_right = tk.StringVar(value="hough")
+right_hough_radio = ttk.Radiobutton(window, text="hough transform", variable=alg_selection_right, value="hough")
+right_hough_radio.place(x=950, y=580)
+right_sliding_radio = ttk.Radiobutton(window, text="sliding window", variable=alg_selection_right, value="sliding")
+right_sliding_radio.place(x=1100, y=580)
 
 # Radio buttons for Lane and Road selection for both cameras
 mode_selection_left = tk.StringVar(value="Lane")
@@ -96,9 +107,9 @@ log_console.place(x=10, y=870, width=1340, height=150)
 # Function to repeatedly call update_all_frames
 def schedule_update():
     update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
-                      get_hsv_min_values("Left"), get_hsv_max_values("Left"), get_erode_size("Left"), get_dilate_size("Left"),"Left")
+                      get_hsv_min_values("Left"), get_hsv_max_values("Left"), get_erode_size("Left"), get_dilate_size("Left"),"Left",alg_selection_left.get())
     update_all_frames(cap_right, right_frame1, right_frame2, right_frame3, right_frame4, log_func, distance_label_right,
-                      get_hsv_min_values("Right"), get_hsv_max_values("Right"), get_erode_size("Right"), get_dilate_size("Right"),"Right")
+                      get_hsv_min_values("Right"), get_hsv_max_values("Right"), get_erode_size("Right"), get_dilate_size("Right"),"Right",alg_selection_right.get())
     window.after(10, schedule_update)
 
 # Start the initial frame update and schedule recurring updates

@@ -15,10 +15,16 @@ def process_frame_with_masked_lines(frame, log_func, lowerb, upperb, erode_kerne
     cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
     return process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
 
-def process_detected_lines_and_distance(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size):
+def process_detected_lines_and_distance(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size, algorithm):
     cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
     mask = process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
-    lines, distance = detect_horizontal_lanes(mask, frame)  # Detect horizontal lanes
+
+    if algorithm == "hough":
+        lines, distance = detect_horizontal_lanes(mask, frame)  # Detect horizontal lanes
+    else:
+        lines, lane_fitx, ploty, distance = detect_horizontal_lane_with_sliding_window(
+        mask, frame)
+    
     return lines, distance
 
 def process_frame_with_mask(frame, log_func, lowerb, upperb, erode_kernel_size=5, dilate_kernel_size=5):
@@ -28,13 +34,16 @@ def process_frame_with_mask(frame, log_func, lowerb, upperb, erode_kernel_size=5
     # Create a mask based on the provided HSV ranges
     mask = cv2.inRange(hsv_frame, lowerb, upperb)
     
+    # Apply Gaussian Blur to reduce noise and smooth the mask
+    mask = cv2.GaussianBlur(mask, (5, 5), 0)
+    
     # Create kernels for erosion and dilation
     erode_kernel = np.ones((erode_kernel_size, erode_kernel_size), np.uint8)
     dilate_kernel = np.ones((dilate_kernel_size, dilate_kernel_size), np.uint8)
 
-    # Apply erosion followed by dilation (commonly known as an opening operation)
-    mask = cv2.erode(mask, erode_kernel, iterations=1)
-    mask = cv2.dilate(mask, dilate_kernel, iterations=1)
+    # Apply erosion followed by dilation (opening operation)
+    mask = cv2.erode(mask, erode_kernel, iterations=2)
+    mask = cv2.dilate(mask, dilate_kernel, iterations=2)
 
     # Apply the mask to create the binary frame
     binary_frame = cv2.bitwise_and(frame, frame, mask=mask)
@@ -45,36 +54,22 @@ def detect_horizontal_lanes(binary_frame, line_image):
     # Apply Canny edge detection
     edges = cv2.Canny(binary_frame, 50, 150, apertureSize=3)
 
-    # Use Hough Line Transform to detect lines
-    lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold=150)
+    # Use Probabilistic Hough Line Transform for better control
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=300, maxLineGap=50)
 
     distances_to_bottom = []
 
     if lines is not None:
-        for rho, theta in lines[:, 0]:
-            # Only consider horizontal lines (theta close to π/2 or 3π/2)
-            if (np.pi / 2 - np.pi / 18) < theta < (np.pi / 2 + np.pi / 18) or (3 * np.pi / 2 - np.pi / 18) < theta < (3 * np.pi / 2 + np.pi / 18):
-                # Calculate the coordinates for the line
-                a = np.cos(theta)
-                b = np.sin(theta)
-                x0 = a * rho
-                y0 = b * rho
-                x1 = int(x0 + 1000 * (-b))
-                y1 = int(y0 + 1000 * (a))
-                x2 = int(x0 - 1000 * (-b))
-                y2 = int(y0 - 1000 * (a))
-
-                # Draw the line on the image
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            # Calculate slope to filter out non-horizontal lines
+            slope = (y2 - y1) / (x2 - x1 + 1e-6)  # Avoid division by zero
+            if abs(slope) < 0.1:  # Near horizontal
                 cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-                # Calculate the vertical distance from the line to the bottom of the frame
                 frame_height = binary_frame.shape[0]
-
-                # Choose one y-coordinate (y1 or y2) to calculate distance
                 distance_to_bottom = frame_height - max(y1, y2)
                 distances_to_bottom.append(distance_to_bottom)
 
-    # Calculate the average distance if any lines were detected
     average_distance = np.mean(distances_to_bottom) if distances_to_bottom else None
     return line_image, average_distance
 
@@ -96,3 +91,90 @@ def remove_car(frame, exclude_percentage=20):
     masked_frame = cv2.bitwise_and(frame, mask)
     
     return masked_frame
+
+def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=9, margin=30, minpix=30):
+    """
+    Detect horizontal lanes using sliding window method and calculate the distance to the lane.
+
+    Args:
+        binary_frame (numpy.ndarray): Binary image of the road.
+        out_img (numpy.ndarray): Image to draw the detected lane on.
+        n_windows (int): Number of sliding windows.
+        margin (int): Width of the windows +/- margin.
+        minpix (int): Minimum number of pixels found to recenter window.
+
+    Returns:
+        out_img (numpy.ndarray): Image with detected lane drawn.
+        lane_fity (numpy.ndarray): Y values for the lane line.
+        plotx (numpy.ndarray): X values for plotting the lane line.
+        distance_to_lane (float): Distance from the vehicle to the lane line.
+    """
+    # Take a histogram of the right half of the image to find the lane line
+    histogram = np.sum(binary_frame[:, binary_frame.shape[1]//2:], axis=1)
+
+    # Find the peak of the histogram, which indicates the position of the lane line
+    lane_base = np.argmax(histogram)
+
+    # Set width of windows
+    window_width = int(binary_frame.shape[1] // n_windows)
+    
+    # Identify the x and y positions of all nonzero pixels in the image
+    nonzero = binary_frame.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+
+    # Current position to be updated for each window
+    lane_current = lane_base
+
+    # Create empty list to receive lane line pixel indices
+    lane_inds = []
+
+    # Step through the windows one by one
+    for window in range(n_windows):
+        # Identify window boundaries in x and y (and top and bottom)
+        win_x_low = binary_frame.shape[1] - (window + 1) * window_width
+        win_x_high = binary_frame.shape[1] - window * window_width
+        win_y_low = lane_current - margin
+        win_y_high = lane_current + margin
+
+        # Draw the window on the visualization image
+        cv2.rectangle(out_img, (win_x_low, win_y_low), (win_x_high, win_y_high), (0, 255, 0), 2)
+
+        # Identify the nonzero pixels in x and y within the window
+        good_lane_inds = ((nonzerox >= win_x_low) & (nonzerox < win_x_high) & 
+                          (nonzeroy >= win_y_low) & (nonzeroy < win_y_high)).nonzero()[0]
+        
+        # Append these indices to the list
+        lane_inds.append(good_lane_inds)
+
+        # If found > minpix pixels, recenter next window on their mean position
+        if len(good_lane_inds) > minpix:
+            lane_current = int(np.mean(nonzeroy[good_lane_inds]))
+
+    # Concatenate the arrays of indices
+    lane_inds = np.concatenate(lane_inds)
+
+    # Extract lane line pixel positions
+    lanex = nonzerox[lane_inds]
+    laney = nonzeroy[lane_inds]
+
+    # Check if we have enough points to fit a line
+    if len(lanex) == 0 or len(laney) == 0:
+        # Not enough points to fit a polynomial
+        return out_img, None, None, None  # or other default values
+
+    # Fit a second order polynomial to the lane line pixels
+    lane_fit = np.polyfit(lanex, laney, 2)
+
+    # Generate x and y values for plotting
+    plotx = np.linspace(0, binary_frame.shape[1] - 1, binary_frame.shape[1])
+    lane_fity = lane_fit[0] * plotx**2 + lane_fit[1] * plotx + lane_fit[2]
+
+    # Calculate distance to the lane line at the right edge of the frame
+    frame_center = binary_frame.shape[0] / 2
+    distance_to_lane = lane_fity[-1] - frame_center  # Distance from the vehicle to the lane line
+
+    # Highlight the lane pixels
+    out_img[nonzeroy[lane_inds], nonzerox[lane_inds]] = [255, 0, 0]
+
+    return out_img, lane_fity, plotx, distance_to_lane
