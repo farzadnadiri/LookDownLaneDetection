@@ -8,6 +8,10 @@ from video_controls import update_all_frames
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
+from pid_controller import PIDController, update_steering
+
+pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01)
+dt = 0.1  # Time step for PID calculation
 
 def log_message(textbox, message):
     textbox.insert(tk.END, message + "\n")
@@ -32,6 +36,61 @@ def create_frame_and_label(x, y, text):
     label = ttk.Label(window, text=text)
     label.place(x=x, y=y+250, width=320, height=20)
     return frame, label
+
+def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering_adjustment):
+    canvas.delete("all")  # Clear previous drawings
+
+    # Define lane positions and car position
+    canvas_width = 450
+    canvas_height = 150
+    lane_width = 200
+    
+    # Center of the canvas
+    center_x = canvas_width // 2
+    
+    # Fixed lane positions
+    left_lane_x = (canvas_width - lane_width) // 2
+    right_lane_x = (canvas_width + lane_width) // 2
+    
+    # Adjust the car's horizontal position based on steering adjustment
+    car_x = center_x - (right_lane_distance - left_lane_distance)
+    steering_wheel_x = center_x + steering_adjustment
+
+    # Draw left lane (fixed position)
+    canvas.create_line(left_lane_x, 0, left_lane_x, canvas_height, fill="blue", width=5)
+    
+    # Draw right lane (fixed position)
+    canvas.create_line(right_lane_x, 0, right_lane_x, canvas_height, fill="blue", width=5)
+    
+    # Draw the car as a rectangle centered between the lanes
+    car_y = canvas_height // 2 + 10
+    car_width = 50
+    car_height = 80
+    canvas.create_rectangle(car_x - car_width // 2, car_y - car_height // 2, car_x + car_width // 2, car_y + car_height // 2, fill="green")
+
+    # Draw the steering wheel 
+    steering_wheel_y = canvas_height // 2 - 40
+    steering_wheel_width = 50
+    steering_wheel_height = 10
+    canvas.create_rectangle(steering_wheel_x - steering_wheel_width // 2, steering_wheel_y - steering_wheel_height // 2, steering_wheel_x + steering_wheel_width // 2, steering_wheel_y + steering_wheel_height // 2, fill="orange")
+     # === Add Legend to the right side of the canvas ===
+
+    legend_x = canvas_width - 50  # X-position for the legend
+    legend_y_start = 10            # Starting Y-position for the first legend item
+    legend_spacing = 20            # Spacing between legend items
+
+    # Blue lane lines
+    canvas.create_rectangle(legend_x, legend_y_start, legend_x + 10, legend_y_start + 10, fill="blue")
+    canvas.create_text(legend_x + 20, legend_y_start + 5, anchor="w", text="Lane Lines", fill="black")
+
+    # Green car
+    canvas.create_rectangle(legend_x, legend_y_start + legend_spacing, legend_x + 10, legend_y_start + 10 + legend_spacing, fill="green")
+    canvas.create_text(legend_x + 20, legend_y_start + 5 + legend_spacing, anchor="w", text="Car", fill="black")
+
+    # Orange steering wheel
+    canvas.create_rectangle(legend_x, legend_y_start + 2 * legend_spacing, legend_x + 10, legend_y_start + 10 + 2 * legend_spacing, fill="orange")
+    canvas.create_text(legend_x + 20, legend_y_start + 5 + 2 * legend_spacing, anchor="w", text="Steering Wheel", fill="black")
+
 
 def create_histogram(parent, data):
     # Ensure data is 1D
@@ -116,19 +175,26 @@ load_button_right.place(x=950, y=615, width=100, height=30)
 reset_button_right = ttk.Button(window, text="Reset Right", command=lambda: reset_hsv_values(log_func, "Right"))
 reset_button_right.place(x=1060, y=615, width=100, height=30)
 
-
 # Log console
 log_console = ScrolledText(window, height=10)
-log_console.place(x=10, y=870, width=1340, height=150)
+log_console.place(x=10, y=870, width=670, height=150)
+
+# canvas drawing
+canvas = tk.Canvas(window, width=650, height=150, bg="white")
+canvas.place(x=690, y=870)
 
 
 # Function to repeatedly call update_all_frames
 def schedule_update():
-    historgramLeft = update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
+    distance_left = update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
                       get_hsv_min_values("Left"), get_hsv_max_values("Left"), get_erode_size("Left"), get_dilate_size("Left"),"Left",alg_selection_left.get())
-    update_all_frames(cap_right, right_frame1, right_frame2, right_frame3, right_frame4, log_func, distance_label_right,
+    distance_right = update_all_frames(cap_right, right_frame1, right_frame2, right_frame3, right_frame4, log_func, distance_label_right,
                       get_hsv_min_values("Right"), get_hsv_max_values("Right"), get_erode_size("Right"), get_dilate_size("Right"),"Right",alg_selection_right.get())
-    
+    if distance_left is not None and distance_right is not None:
+        error = distance_right - distance_left
+        steering_adjustment = update_steering(distance_right/10, distance_left/10, pid_controller, dt)
+        draw_lanes_and_car(canvas, distance_right/10, distance_left/10, steering_adjustment)
+        log_func(f"distance error:{error} steering_adjustment: {steering_adjustment}")
     window.after(10, schedule_update)
 
 # Start the initial frame update and schedule recurring updates
