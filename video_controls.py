@@ -27,7 +27,7 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
         processed_frame1 = process_original_frame(frame.copy(), log_func)
         processed_frame2 = process_frame_with_convex_hull(frame.copy(), log_func)
         processed_frame3 = process_frame_with_masked_lines(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size)
-        processed_frame4, distance = process_detected_lines_and_distance(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size,algorithm)
+        processed_frame4, distance , histogram = process_detected_lines_and_distance(frame.copy(), log_func, lower_b, upper_b, erode_kernel_size, dilate_kernel_size,algorithm)
    
         if distance_label:
             if distance is not None:
@@ -40,6 +40,7 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
         display_frame(frame2, processed_frame2)
         display_frame(frame3, processed_frame3)
         display_frame(frame4, processed_frame4)
+    return histogram
 
 def display_frame(label, frame):
     frame = cv2.resize(frame, (320, 240))
@@ -48,3 +49,6 @@ def display_frame(label, frame):
     frame_tk = ImageTk.PhotoImage(image=frame_img)
     label.imgtk = frame_tk
     label.config(image=frame_tk)
+
+def display_plot(label, frame):
+    label.imgtk = frame

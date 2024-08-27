@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 def process_original_frame(frame, log_func):
     # log_func("Processing original frame")
@@ -18,14 +19,14 @@ def process_frame_with_masked_lines(frame, log_func, lowerb, upperb, erode_kerne
 def process_detected_lines_and_distance(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size, algorithm):
     cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
     mask = process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
-
+    histogram = cleaned_frame
     if algorithm == "hough":
         lines, distance = detect_horizontal_lanes(mask, frame)  # Detect horizontal lanes
     else:
-        lines, lane_fitx, ploty, distance = detect_horizontal_lane_with_sliding_window(
+        lines, lane_fitx, ploty, distance, histogram = detect_horizontal_lane_with_sliding_window(
         mask, frame)
     
-    return lines, distance
+    return lines, distance , histogram
 
 def process_frame_with_mask(frame, log_func, lowerb, upperb, erode_kernel_size=5, dilate_kernel_size=5):
     # Convert frame to HSV color space
@@ -44,18 +45,15 @@ def process_frame_with_mask(frame, log_func, lowerb, upperb, erode_kernel_size=5
     # Apply erosion followed by dilation (opening operation)
     mask = cv2.erode(mask, erode_kernel, iterations=2)
     mask = cv2.dilate(mask, dilate_kernel, iterations=2)
-
-    # Apply the mask to create the binary frame
-    binary_frame = cv2.bitwise_and(frame, frame, mask=mask)
     
-    return binary_frame
+    return mask
 
 def detect_horizontal_lanes(binary_frame, line_image):
     # Apply Canny edge detection
     edges = cv2.Canny(binary_frame, 50, 150, apertureSize=3)
 
     # Use Probabilistic Hough Line Transform for better control
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=300, maxLineGap=50)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=500, maxLineGap=50)
 
     distances_to_bottom = []
 
@@ -92,7 +90,7 @@ def remove_car(frame, exclude_percentage=20):
     
     return masked_frame
 
-def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=9, margin=30, minpix=30):
+def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=9, margin=30, minpix=1000):
     """
     Detect horizontal lanes using sliding window method and calculate the distance to the lane.
 
@@ -109,12 +107,26 @@ def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=
         plotx (numpy.ndarray): X values for plotting the lane line.
         distance_to_lane (float): Distance from the vehicle to the lane line.
     """
-    # Take a histogram of the right half of the image to find the lane line
-    histogram = np.sum(binary_frame[:, binary_frame.shape[1]//2:], axis=1)
+    # Take a histogram of the image to find the lane line
+    histogram = np.sum(binary_frame, axis=1)
+    # Apply a simple moving average (smoothing filter) to reduce noise
 
+ # Check if the peak of the histogram is less than the threshold
+    if np.max(histogram) < 50000: # thershhold to cancel algorithm
+        return out_img, None, None, None, histogram
+    print(np.max(histogram))
     # Find the peak of the histogram, which indicates the position of the lane line
     lane_base = np.argmax(histogram)
 
+    if 0==1: # adjust it if you want plot
+        plt.figure(figsize=(10, 5))
+        plt.plot(histogram, label='Histogram of pixel sums')
+        plt.axvline(x=lane_base, color='red', linestyle='--', label=f'Peak at row {lane_base}')
+        plt.title('Histogram of Image Row Intensities with Peak Highlighted')
+        plt.xlabel('Row Index')
+        plt.ylabel('Sum of Pixel Values')
+        plt.legend()
+        plt.show()
     # Set width of windows
     window_width = int(binary_frame.shape[1] // n_windows)
     
@@ -161,7 +173,7 @@ def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=
     # Check if we have enough points to fit a line
     if len(lanex) == 0 or len(laney) == 0:
         # Not enough points to fit a polynomial
-        return out_img, None, None, None  # or other default values
+        return out_img, None, None, None, None  # or other default values
 
     # Fit a second order polynomial to the lane line pixels
     lane_fit = np.polyfit(lanex, laney, 2)
@@ -170,11 +182,10 @@ def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=
     plotx = np.linspace(0, binary_frame.shape[1] - 1, binary_frame.shape[1])
     lane_fity = lane_fit[0] * plotx**2 + lane_fit[1] * plotx + lane_fit[2]
 
-    # Calculate distance to the lane line at the right edge of the frame
-    frame_center = binary_frame.shape[0] / 2
-    distance_to_lane = lane_fity[-1] - frame_center  # Distance from the vehicle to the lane line
+    
+    distance_to_lane = binary_frame.shape[0] - lane_fity[-1]  # Distance from the vehicle to the lane line
 
     # Highlight the lane pixels
     out_img[nonzeroy[lane_inds], nonzerox[lane_inds]] = [255, 0, 0]
 
-    return out_img, lane_fity, plotx, distance_to_lane
+    return out_img, lane_fity, plotx, distance_to_lane, histogram

@@ -4,6 +4,10 @@ from tkinter.scrolledtext import ScrolledText
 import cv2
 from hsv_controls import create_hsv_controls, save_hsv_values, load_hsv_values, reset_hsv_values, get_hsv_min_values, get_hsv_max_values, get_erode_size, get_dilate_size
 from video_controls import update_all_frames
+# Import Matplotlib modules for embedding
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
 
 def log_message(textbox, message):
     textbox.insert(tk.END, message + "\n")
@@ -15,7 +19,7 @@ def log_func(message):
 # Window setup
 window = tk.Tk()
 window.title("Lane Detection using Look Down Method")
-window.geometry('1360x1550')  # Adjusted height for better layout
+window.geometry('1900x1550')  # Adjusted height for better layout
 
 # Video capture objects for left and right cameras
 cap_left = cv2.VideoCapture('sample_left.mp4')
@@ -28,6 +32,20 @@ def create_frame_and_label(x, y, text):
     label = ttk.Label(window, text=text)
     label.place(x=x, y=y+250, width=320, height=20)
     return frame, label
+
+def create_histogram(parent, data):
+    # Ensure data is 1D
+    data = np.ravel(data)  # Use np.ravel() to flatten any multi-dimensional array to 1D
+    
+    fig = Figure(figsize=(4, 3), dpi=100)
+    ax = fig.add_subplot(111)
+    ax.hist(data, bins=30, color='blue', alpha=0.7)
+    
+    # Embed Matplotlib figure into Tkinter canvas
+    canvas = FigureCanvasTkAgg(fig, master=parent)
+    canvas.draw()
+    canvas.get_tk_widget().place(x=1400, y=10, width=400, height=300)  # Position it as needed
+    return canvas
 
 # Create frames for the left camera
 left_frame1, left_label1 = create_frame_and_label(10, 10, "Original Frame (Left)")
@@ -106,10 +124,11 @@ log_console.place(x=10, y=870, width=1340, height=150)
 
 # Function to repeatedly call update_all_frames
 def schedule_update():
-    update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
+    historgramLeft = update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
                       get_hsv_min_values("Left"), get_hsv_max_values("Left"), get_erode_size("Left"), get_dilate_size("Left"),"Left",alg_selection_left.get())
     update_all_frames(cap_right, right_frame1, right_frame2, right_frame3, right_frame4, log_func, distance_label_right,
                       get_hsv_min_values("Right"), get_hsv_max_values("Right"), get_erode_size("Right"), get_dilate_size("Right"),"Right",alg_selection_right.get())
+    
     window.after(10, schedule_update)
 
 # Start the initial frame update and schedule recurring updates
