@@ -33,14 +33,14 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
             if distance is not None:
                 distance_label.config(text=f"Distance to lane ({side}): {int(distance)} px")
             else:
-                distance_label.config(text="Distance to lane ({side}): N/A")
+                distance_label.config(text=f"Distance to lane ({side}): N/A")
         
         # Display each processed frame in the corresponding label
         display_frame(frame1, processed_frame1)
         display_frame(frame2, processed_frame2)
         display_frame(frame3, processed_frame3)
         display_frame(frame4, processed_frame4)
-    return histogram
+    return distance
 
 def display_frame(label, frame):
     frame = cv2.resize(frame, (320, 240))
