@@ -19,7 +19,7 @@ def log_func(message):
 # Window setup
 window = tk.Tk()
 window.title("Lane Detection using Look Down Method")
-window.geometry('1900x1550')  # Adjusted height for better layout
+window.geometry('1360x1550')  # Adjusted height for better layout
 
 # Video capture objects for left and right cameras
 cap_left = cv2.VideoCapture('sample_left.mp4')

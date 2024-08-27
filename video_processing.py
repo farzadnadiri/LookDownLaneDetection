@@ -114,7 +114,6 @@ def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=
  # Check if the peak of the histogram is less than the threshold
     if np.max(histogram) < 50000: # thershhold to cancel algorithm
         return out_img, None, None, None, histogram
-    print(np.max(histogram))
     # Find the peak of the histogram, which indicates the position of the lane line
     lane_base = np.argmax(histogram)
 
