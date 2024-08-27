@@ -62,6 +62,8 @@ def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering
     # Draw right lane (fixed position)
     canvas.create_line(right_lane_x, 0, right_lane_x, canvas_height, fill="blue", width=5)
     
+    canvas.create_line(center_x, 0, center_x, canvas_height, fill="gray", width=1, dash=(2, 4))
+
     # Draw the car as a rectangle centered between the lanes
     car_y = canvas_height // 2 + 10
     car_width = 50
@@ -76,7 +78,7 @@ def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering
      # === Add Legend to the right side of the canvas ===
 
     legend_x = canvas_width - 50  # X-position for the legend
-    legend_y_start = 10            # Starting Y-position for the first legend item
+    legend_y_start = 30            # Starting Y-position for the first legend item
     legend_spacing = 20            # Spacing between legend items
 
     # Blue lane lines
@@ -91,6 +93,9 @@ def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering
     canvas.create_rectangle(legend_x, legend_y_start + 2 * legend_spacing, legend_x + 10, legend_y_start + 10 + 2 * legend_spacing, fill="orange")
     canvas.create_text(legend_x + 20, legend_y_start + 5 + 2 * legend_spacing, anchor="w", text="Steering Wheel", fill="black")
 
+    # Gray lane center
+    canvas.create_rectangle(legend_x, legend_y_start + 3 * legend_spacing, legend_x + 10, legend_y_start + 10 + 3 * legend_spacing, fill="gray")
+    canvas.create_text(legend_x + 20, legend_y_start + 5 + 3 * legend_spacing, anchor="w", text="Lane Center", fill="black")
 
 def create_histogram(parent, data):
     # Ensure data is 1D
