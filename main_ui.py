@@ -10,7 +10,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from pid_controller import PIDController, update_steering
 
-pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01)
+pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, integral_limit=10)
 dt = 0.1  # Time step for PID calculation
 
 def log_message(textbox, message):
