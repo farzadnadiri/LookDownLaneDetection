@@ -40,7 +40,7 @@ def update_all_frames(cap, frame1, frame2, frame3, frame4, log_func, distance_la
         display_frame(frame2, processed_frame2)
         display_frame(frame3, processed_frame3)
         display_frame(frame4, processed_frame4)
-    return distance
+    return distance , histogram
 
 def display_frame(label, frame):
     frame = cv2.resize(frame, (320, 240))

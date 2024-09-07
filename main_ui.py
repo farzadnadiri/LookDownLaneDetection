@@ -4,15 +4,22 @@ from tkinter.scrolledtext import ScrolledText
 import cv2
 from hsv_controls import create_hsv_controls, save_hsv_values, load_hsv_values, reset_hsv_values, get_hsv_min_values, get_hsv_max_values, get_erode_size, get_dilate_size
 from video_controls import update_all_frames
-# Import Matplotlib modules for embedding
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from pid_controller import PIDController, update_steering
+import matplotlib.pyplot as plt  # Importing pyplot as plt
 
 pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, integral_limit=10)
 dt = 0.1  # Time step for PID calculation
 
+new_left_lane = 0
+new_right_lane = 0
+new_steering_adjustment = 0
+new_actual_car_position = 0
+new_projected_car_position = 0
+new_histogram_left = None
+new_histogram_right = None
 def log_message(textbox, message):
     textbox.insert(tk.END, message + "\n")
     textbox.see(tk.END)
@@ -97,19 +104,121 @@ def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering
     canvas.create_rectangle(legend_x, legend_y_start + 3 * legend_spacing, legend_x + 10, legend_y_start + 10 + 3 * legend_spacing, fill="gray")
     canvas.create_text(legend_x + 20, legend_y_start + 5 + 3 * legend_spacing, anchor="w", text="Lane Center", fill="black")
 
-def create_histogram(parent, data):
-    # Ensure data is 1D
-    data = np.ravel(data)  # Use np.ravel() to flatten any multi-dimensional array to 1D
+# Function to open a new window for displaying real-time graphs
+def open_chart_window():
+    chart_window = tk.Toplevel(window)  # Create a new window
+    chart_window.title("Real-time Graphs")
+    chart_window.geometry("1200x800")  # Set the size of the new window
+
+    # Create a Matplotlib figure with 4 subplots (2x2 grid)
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    fig.tight_layout(pad=5.0)
+
+    # Create empty line plots for each graph
+
+    # Graph 1: Left and Right lane distances
+    x_data = np.linspace(0, 10, 100)
+    left_lane_data = np.zeros_like(x_data)
+    right_lane_data = np.zeros_like(x_data)
+    left_line, = axs[0, 0].plot(x_data, left_lane_data, color='red', label="Left Lane Distance")
+    right_line, = axs[0, 0].plot(x_data, right_lane_data, color='blue', label="Right Lane Distance")
+    axs[0, 0].set_title("Left and Right Lane Distances")
+    axs[0, 0].set_xlabel("Time")
+    axs[0, 0].set_ylabel("Distance")
+    axs[0, 0].legend()
+
+    # Graph 2: Steering wheel adjustment
+    steering_data = np.zeros_like(x_data)
+    error_data = np.zeros_like(x_data)
+    steering_line, = axs[0, 1].plot(x_data, steering_data, color='green', label="Steering Adjustment")
+    error_line, = axs[0, 1].plot(x_data, error_data, color='red', label="left and right Error")
+    axs[0, 1].set_title("Steering Wheel Adjustment")
+    axs[0, 1].set_xlabel("Time")
+    axs[0, 1].set_ylabel("Adjustment Value")
+    axs[0, 1].legend()
+
+    # Graph 3: Actual car position and projected car position
+    actual_car_data = np.zeros_like(x_data)
+    projected_car_data = np.zeros_like(x_data)
+    actual_car_line, = axs[1, 0].plot(x_data, actual_car_data, color='orange', label="Actual Car Position")
+    projected_car_line, = axs[1, 0].plot(x_data, projected_car_data, color='purple', label="Projected Car Position")
+    axs[1, 0].set_title("Car Position (Actual vs Projected)")
+    axs[1, 0].set_xlabel("Time")
+    axs[1, 0].set_ylabel("Position")
+    axs[1, 0].legend()
+
+    # Graph 4: Left and Right histograms with lane base markers
+    histogram_x = np.arange(len(new_histogram_left))
     
-    fig = Figure(figsize=(4, 3), dpi=100)
-    ax = fig.add_subplot(111)
-    ax.hist(data, bins=30, color='blue', alpha=0.7)
+    left_hist_line, = axs[1, 1].plot(histogram_x, new_histogram_left, color='blue', label="Left Histogram")
+    right_hist_line, = axs[1, 1].plot(histogram_x, new_histogram_right, color='red', label="Right Histogram")
+    left_lane_base_line = axs[1, 1].axvline(x=0, color='blue', linestyle='--', label='Left Peak')
+    right_lane_base_line = axs[1, 1].axvline(x=0, color='red', linestyle='--', label='Right Peak')
     
-    # Embed Matplotlib figure into Tkinter canvas
-    canvas = FigureCanvasTkAgg(fig, master=parent)
+    axs[1, 1].set_title("Left and Right Frame Histograms with Lane Base Peaks")
+    axs[1, 1].set_xlabel("Pixel Intensity")
+    axs[1, 1].set_ylabel("Frequency")
+    axs[1, 1].legend()
+
+    # Embed the Matplotlib figure into the Tkinter window
+    canvas = FigureCanvasTkAgg(fig, master=chart_window)
     canvas.draw()
-    canvas.get_tk_widget().place(x=1400, y=10, width=400, height=300)  # Position it as needed
-    return canvas
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+    def update_graph(new_left_lane, new_right_lane, new_steering_adjustment, new_actual_car_position, new_projected_car_position,new_histogram_left, new_histogram_right):
+        # Update lane distances
+        left_lane_data[:-1] = left_lane_data[1:]  # Shift data to the left
+        right_lane_data[:-1] = right_lane_data[1:]
+        left_lane_data[-1] = new_left_lane  # Add new data
+        right_lane_data[-1] = new_right_lane
+        left_line.set_ydata(left_lane_data)
+        right_line.set_ydata(right_lane_data)
+
+        # Update steering adjustment
+        steering_data[:-1] = steering_data[1:]
+        steering_data[-1] = new_steering_adjustment
+        steering_line.set_ydata(steering_data)
+        error = right_lane_data - left_lane_data
+        error_line.set_ydata(error)
+
+        # Update actual and projected car position
+        actual_car_data[:-1] = actual_car_data[1:]
+        projected_car_data[:-1] = projected_car_data[1:]
+        actual_car_data[-1] = new_actual_car_position
+        projected_car_data[-1] = new_projected_car_position
+        actual_car_line.set_ydata(error)
+        projected_car_line.set_ydata(error + steering_data)
+
+           # Update histograms and lane base markers
+        if new_histogram_left is not None and new_histogram_right is not None:
+            left_hist_line.set_ydata(new_histogram_left)
+            right_hist_line.set_ydata(new_histogram_right)
+
+            # Update lane base markers using np.argmax to find the peaks
+            left_lane_base = np.argmax(new_histogram_left)
+            right_lane_base = np.argmax(new_histogram_right)
+            left_lane_base_line.set_xdata([left_lane_base])
+            right_lane_base_line.set_xdata([right_lane_base])
+
+        # Redraw the canvas with the updated plots
+        axs[0, 0].relim()
+        axs[0, 0].autoscale_view()
+        axs[0, 1].relim()
+        axs[0, 1].autoscale_view()
+        axs[1, 0].relim()
+        axs[1, 0].autoscale_view()
+        axs[1, 1].relim()
+        axs[1, 1].autoscale_view()
+        canvas.draw()
+
+    def update_graph_periodically():
+        # Update graphs with new data
+        update_graph(new_left_lane, new_right_lane, new_steering_adjustment, new_actual_car_position, new_projected_car_position, new_histogram_left, new_histogram_right)
+        # Call this function again after 500 ms
+        chart_window.after(500, update_graph_periodically)
+
+    # Start the periodic updates
+    update_graph_periodically()
 
 # Create frames for the left camera
 left_frame1, left_label1 = create_frame_and_label(10, 10, "Original Frame (Left)")
@@ -188,19 +297,35 @@ log_console.place(x=10, y=870, width=670, height=150)
 canvas = tk.Canvas(window, width=650, height=150, bg="white")
 canvas.place(x=690, y=870)
 
+# open the real-time graph window
+btn_open_chart = ttk.Button(window, text="Open Graphs", command=open_chart_window)
+btn_open_chart.place(x=1230, y=880, width=100, height=30)
 
 # Function to repeatedly call update_all_frames
 def schedule_update():
-    distance_left = update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
+    if window.winfo_exists():
+        distance_left, histogram_left = update_all_frames(cap_left, left_frame1, left_frame2, left_frame3, left_frame4, log_func, distance_label_left,
                       get_hsv_min_values("Left"), get_hsv_max_values("Left"), get_erode_size("Left"), get_dilate_size("Left"),"Left",alg_selection_left.get())
-    distance_right = update_all_frames(cap_right, right_frame1, right_frame2, right_frame3, right_frame4, log_func, distance_label_right,
+        distance_right, histogram_right = update_all_frames(cap_right, right_frame1, right_frame2, right_frame3, right_frame4, log_func, distance_label_right,
                       get_hsv_min_values("Right"), get_hsv_max_values("Right"), get_erode_size("Right"), get_dilate_size("Right"),"Right",alg_selection_right.get())
-    if distance_left is not None and distance_right is not None:
-        error = distance_right - distance_left
-        steering_adjustment = update_steering(distance_right/10, distance_left/10, pid_controller, dt)
-        draw_lanes_and_car(canvas, distance_right/10, distance_left/10, steering_adjustment)
-        log_func(f"distance error:{error} steering_adjustment: {steering_adjustment}")
-    window.after(10, schedule_update)
+        if distance_left is not None and distance_right is not None:
+            global new_left_lane
+            global new_right_lane
+            global new_steering_adjustment
+            global new_histogram_left
+            global new_histogram_right
+
+            new_left_lane = distance_left
+            new_right_lane = distance_right
+            new_histogram_left = histogram_left
+            new_histogram_right = histogram_right
+            error = distance_right - distance_left
+
+            steering_adjustment = update_steering(distance_right/10, distance_left/10, pid_controller, dt)
+            new_steering_adjustment = -10 * steering_adjustment
+            draw_lanes_and_car(canvas, distance_right/10, distance_left/10, steering_adjustment)
+            log_func(f"distance error:{error} steering_adjustment: {steering_adjustment}")
+        window.after(10, schedule_update)
 
 # Start the initial frame update and schedule recurring updates
 schedule_update()

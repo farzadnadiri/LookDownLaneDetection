@@ -117,15 +117,6 @@ def detect_horizontal_lane_with_sliding_window(binary_frame, out_img, n_windows=
     # Find the peak of the histogram, which indicates the position of the lane line
     lane_base = np.argmax(histogram)
 
-    if 0==1: # adjust it if you want plot
-        plt.figure(figsize=(10, 5))
-        plt.plot(histogram, label='Histogram of pixel sums')
-        plt.axvline(x=lane_base, color='red', linestyle='--', label=f'Peak at row {lane_base}')
-        plt.title('Histogram of Image Row Intensities with Peak Highlighted')
-        plt.xlabel('Row Index')
-        plt.ylabel('Sum of Pixel Values')
-        plt.legend()
-        plt.show()
     # Set width of windows
     window_width = int(binary_frame.shape[1] // n_windows)
     
