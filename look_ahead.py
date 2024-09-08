@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Video capture for input video
-video = cv2.VideoCapture("LookAheadLaneVideo.mp4")
+video = cv2.VideoCapture("sample_look_ahead.mp4")
 is_frame_available, frame_image = video.read()
 
 # Placeholder function for trackbars
@@ -18,18 +19,76 @@ cv2.createTrackbar("High - H", "HSV_Adjustments", 255, 255, empty_callback)
 cv2.createTrackbar("High - S", "HSV_Adjustments", 50, 255, empty_callback)
 cv2.createTrackbar("High - V", "HSV_Adjustments", 255, 255, empty_callback)
 
+# Enable interactive mode for matplotlib
+plt.ion()
+
+# Create a Matplotlib figure for real-time plots
+fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+
+# Create empty line plots for real-time updates
+x_data = np.linspace(0, 10, 100)
+left_lane_data = np.zeros_like(x_data)
+right_lane_data = np.zeros_like(x_data)
+left_line, = axs[0, 0].plot(x_data, left_lane_data, color='red', label="Left Lane Distance")
+right_line, = axs[0, 0].plot(x_data, right_lane_data, color='blue', label="Right Lane Distance")
+axs[0, 0].set_title("Left and Right Lane Distances")
+axs[0, 0].set_xlabel("Time")
+axs[0, 0].set_ylabel("Distance")
+axs[0, 0].legend()
+
+# Create histogram x_data to match the shape of lane_histogram (half the width of the frame, e.g., 400)
+histogram_x_data = np.arange(400)
+new_histogram_left = np.zeros_like(histogram_x_data)
+new_histogram_right = np.zeros_like(histogram_x_data)
+left_hist_line, = axs[1, 1].plot(histogram_x_data, new_histogram_left, color='blue', label="Left Histogram")
+right_hist_line, = axs[1, 1].plot(histogram_x_data, new_histogram_right, color='red', label="Right Histogram")
+axs[1, 1].set_title("Lane Histograms")
+axs[1, 1].set_xlabel("Pixels")
+axs[1, 1].set_ylabel("Intensity")
+axs[1, 1].legend()
+
+# Function to update the charts
+def update_graphs(left_lane_pos, right_lane_pos, histogram_left, histogram_right):
+    # Ensure the lane positions are non-negative
+    left_lane_pos = max(0, left_lane_pos)
+    right_lane_pos = max(0, right_lane_pos)
+
+    # Shift data for real-time updates
+    left_lane_data[:-1] = left_lane_data[1:]
+    right_lane_data[:-1] = right_lane_data[1:]
+    left_lane_data[-1] = left_lane_pos
+    right_lane_data[-1] = right_lane_pos
+
+    left_hist_line.set_ydata(histogram_left)
+    right_hist_line.set_ydata(histogram_right)
+
+    # Update line plots with new data
+    left_line.set_ydata(left_lane_data)
+    right_line.set_ydata(right_lane_data)
+
+    # Rescale the axes automatically
+    axs[0, 0].relim()
+    axs[0, 0].autoscale_view()
+    
+    axs[1, 1].relim()
+    axs[1, 1].autoscale_view()
+
+    # Redraw the canvas
+    fig.canvas.draw()
+    fig.canvas.flush_events()
+
 # Loop through video frames
 while is_frame_available:
     is_frame_available, frame_image = video.read()
     if not is_frame_available:
         break
-    resized_frame = cv2.resize(frame_image, (640, 480))
+    resized_frame = cv2.resize(frame_image, (800, 600))  # Change frame size to 800x600
 
-    # Defining points for perspective transformation
-    top_left = (222, 387)
-    bottom_left = (70, 472)
-    top_right = (400, 380)
-    bottom_right = (538, 472)
+    # Defining points for perspective transformation (adjusted for the new size)
+    top_left = (278, 484)  # Adjusted to match new frame size
+    bottom_left = (88, 590)
+    top_right = (500, 475)
+    bottom_right = (672, 590)
 
     # Drawing circles on the selected points for reference
     cv2.circle(resized_frame, top_left, 5, (0, 0, 255), -1)
@@ -39,11 +98,11 @@ while is_frame_available:
 
     # Perspective transformation from road to bird’s eye view
     src_points = np.float32([top_left, bottom_left, top_right, bottom_right])
-    dst_points = np.float32([[0, 0], [0, 480], [640, 0], [640, 480]])
+    dst_points = np.float32([[0, 0], [0, 600], [800, 0], [800, 600]])  # Updated for 800x600 resolution
     
     # Transformation matrix to change perspective
     transform_matrix = cv2.getPerspectiveTransform(src_points, dst_points)
-    bird_view_frame = cv2.warpPerspective(resized_frame, transform_matrix, (640, 480))
+    bird_view_frame = cv2.warpPerspective(resized_frame, transform_matrix, (800, 600))
 
     # Convert frame to HSV for thresholding
     hsv_bird_view = cv2.cvtColor(bird_view_frame, cv2.COLOR_BGR2HSV)
@@ -68,7 +127,7 @@ while is_frame_available:
     right_lane_base = np.argmax(lane_histogram[center_point:]) + center_point
 
     # Sliding window technique
-    y_coordinate = 472
+    y_coordinate = 590  # Adjusted for new frame height
     left_lane_positions = []
     right_lane_positions = []
 
@@ -104,6 +163,9 @@ while is_frame_available:
                       (right_lane_base+50, y_coordinate-40), (255, 255, 255), 2)
         y_coordinate -= 40
 
+    # Update the real-time graphs
+    update_graphs(left_lane_base, right_lane_base, lane_histogram[:center_point], lane_histogram[center_point:])
+
     # Displaying all frames and masks
     cv2.imshow("Original Frame", resized_frame)
     cv2.imshow("Bird’s Eye View", bird_view_frame)
@@ -113,3 +175,9 @@ while is_frame_available:
     # Exit loop on pressing 'ESC'
     if cv2.waitKey(10) == 27:
         break
+
+# Disable interactive mode after the loop is finished
+plt.ioff()
+
+# Show the final plot
+plt.show()
