@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Video capture for input video
-video = cv2.VideoCapture("sample_look_ahead.mp4")
+video = cv2.VideoCapture("samples\\sample1\\front_camera.mp4")
 is_frame_available, frame_image = video.read()
 
 # Placeholder function for trackbars
@@ -14,10 +14,10 @@ def empty_callback(x):
 cv2.namedWindow("HSV_Adjustments")
 cv2.createTrackbar("Low - H", "HSV_Adjustments", 0, 255, empty_callback)
 cv2.createTrackbar("Low - S", "HSV_Adjustments", 0, 255, empty_callback)
-cv2.createTrackbar("Low - V", "HSV_Adjustments", 200, 255, empty_callback)
+cv2.createTrackbar("Low - V", "HSV_Adjustments", 52, 255, empty_callback)
 cv2.createTrackbar("High - H", "HSV_Adjustments", 255, 255, empty_callback)
-cv2.createTrackbar("High - S", "HSV_Adjustments", 50, 255, empty_callback)
-cv2.createTrackbar("High - V", "HSV_Adjustments", 255, 255, empty_callback)
+cv2.createTrackbar("High - S", "HSV_Adjustments", 17, 255, empty_callback)
+cv2.createTrackbar("High - V", "HSV_Adjustments", 172, 255, empty_callback)
 
 # Enable interactive mode for matplotlib
 plt.ion()
@@ -85,10 +85,10 @@ while is_frame_available:
     resized_frame = cv2.resize(frame_image, (800, 600))  # Change frame size to 800x600
 
     # Defining points for perspective transformation (adjusted for the new size)
-    top_left = (278, 484)  # Adjusted to match new frame size
-    bottom_left = (88, 590)
-    top_right = (500, 475)
-    bottom_right = (672, 590)
+    top_left = (200, 334)  # Adjusted to match new frame size
+    bottom_left = (0, 500)
+    top_right = (570, 334)
+    bottom_right = (800, 500)
 
     # Drawing circles on the selected points for reference
     cv2.circle(resized_frame, top_left, 5, (0, 0, 255), -1)
@@ -119,6 +119,13 @@ while is_frame_available:
     lower_hsv = np.array([low_h, low_s, low_v])
     upper_hsv = np.array([high_h, high_s, high_v])
     binary_mask = cv2.inRange(hsv_bird_view, lower_hsv, upper_hsv)
+    kernel = np.ones((5, 5), np.uint8)  # Define a 5x5 kernel, you can adjust the size
+    
+    # Erode the binary mask to remove noise
+    binary_mask = cv2.erode(binary_mask, kernel, iterations=1)
+
+    # Dilate the binary mask to expand the white regions
+    binary_mask = cv2.dilate(binary_mask, kernel, iterations=2)
 
     # Generating histogram for lane base detection
     lane_histogram = np.sum(binary_mask[binary_mask.shape[0]//2:, :], axis=0)

@@ -33,8 +33,8 @@ window.title("Lane Detection using Look Down Method")
 window.geometry('1360x1550')  # Adjusted height for better layout
 
 # Video capture objects for left and right cameras
-cap_left = cv2.VideoCapture('sample_left.mp4')
-cap_right = cv2.VideoCapture('sample_right.mp4')
+cap_left = cv2.VideoCapture('samples\\sample0\\sample_left.mp4')
+cap_right = cv2.VideoCapture('samples\\sample0\\sample_right.mp4')
 
 # Function to create video frames and labels dynamically
 def create_frame_and_label(x, y, text):
