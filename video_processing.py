@@ -13,11 +13,11 @@ def process_frame_with_convex_hull(frame, log_func):
     return cleaned_frame
 
 def process_frame_with_masked_lines(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size):
-    cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
+    cleaned_frame = remove_car(frame, exclude_percentage=15)  # Use remove_car function
     return process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
 
 def process_detected_lines_and_distance(frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size, algorithm):
-    cleaned_frame = remove_car(frame, exclude_percentage=25)  # Use remove_car function
+    cleaned_frame = remove_car(frame, exclude_percentage=15)  # Use remove_car function
     mask = process_frame_with_mask(cleaned_frame, log_func, lowerb, upperb, erode_kernel_size, dilate_kernel_size)
     histogram = cleaned_frame
     if algorithm == "hough":
