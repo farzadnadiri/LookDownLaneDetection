@@ -44,6 +44,10 @@ def create_frame_and_label(x, y, text):
     label.place(x=x, y=y+250, width=320, height=20)
     return frame, label
 
+def saveChart(line,filename):
+    data = line.get_ydata()
+    np.savetxt(filename, data, delimiter=',')
+
 def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering_adjustment):
     canvas.delete("all")  # Clear previous drawings
 
@@ -68,7 +72,6 @@ def draw_lanes_and_car(canvas, right_lane_distance, left_lane_distance, steering
     
     # Draw right lane (fixed position)
     canvas.create_line(right_lane_x, 0, right_lane_x, canvas_height, fill="blue", width=5)
-    
     canvas.create_line(center_x, 0, center_x, canvas_height, fill="gray", width=1, dash=(2, 4))
 
     # Draw the car as a rectangle centered between the lanes
@@ -188,7 +191,7 @@ def open_chart_window():
         projected_car_data[-1] = new_projected_car_position
         actual_car_line.set_ydata(error)
         projected_car_line.set_ydata(error + steering_data)
-
+        saveChart(projected_car_line,"look_down.csv")
            # Update histograms and lane base markers
         if new_histogram_left is not None and new_histogram_right is not None:
             left_hist_line.set_ydata(new_histogram_left)

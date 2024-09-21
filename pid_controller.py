@@ -26,8 +26,6 @@ class PIDController:
         # PID output
         return proportional + integral + derivative
 
-
-
 def update_steering(right_lane_distance, left_lane_distance, pid_controller, dt):
     # Calculate error
     error = right_lane_distance - left_lane_distance

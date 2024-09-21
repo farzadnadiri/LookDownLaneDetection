@@ -1,6 +1,10 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from pid_controller import PIDController, update_steering
+
+pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, integral_limit=10)
+dt = 0.1  # Time step for PID calculation
 
 # Video capture for input video
 video = cv2.VideoCapture("samples\\sample3\\front_camera.mp4")
@@ -22,8 +26,12 @@ cv2.createTrackbar("High - V", "HSV_Adjustments", 255, 255, empty_callback)
 # Enable interactive mode for matplotlib
 plt.ion()
 
+def saveChart(line, filename):
+    data = line.get_ydata()
+    np.savetxt(filename, data, delimiter=',')
+
 # Create a Matplotlib figure for real-time plots
-fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+fig, axs = plt.subplots(2, 2, figsize=(12, 9))
 
 # Create empty line plots for real-time updates
 x_data = np.linspace(0, 10, 100)
@@ -35,6 +43,28 @@ axs[0, 0].set_title("Left and Right Lane Distances")
 axs[0, 0].set_xlabel("Time")
 axs[0, 0].set_ylabel("Distance")
 axs[0, 0].legend()
+
+# Create empty line plots for real-time updates
+adjustment_x_data = np.linspace(0, 10, 100)
+error_data = np.zeros_like(adjustment_x_data)
+adjustment_data = np.zeros_like(adjustment_x_data)
+error_line, = axs[0, 1].plot(adjustment_x_data, error_data, color='red', label="Error data")
+adjustment_line, = axs[0, 1].plot(adjustment_x_data, adjustment_data, color='green', label="Adjustment data")
+axs[0, 1].set_title("Steering Wheel Adjustment")
+axs[0, 1].set_xlabel("Time")
+axs[0, 1].set_ylabel("Adjustment Value")
+axs[0, 1].legend()
+
+# Create empty line plots for real-time updates
+position_x_data = np.linspace(0, 10, 100)
+actual_car_data = np.zeros_like(position_x_data)
+projected_car_data = np.zeros_like(position_x_data)
+actual_car_line, = axs[1, 0].plot(position_x_data, actual_car_data, color='orange', label="Actual Car Position")
+projected_car_line, = axs[1, 0].plot(position_x_data, projected_car_data, color='purple', label="Projected Car Position")
+axs[1, 0].set_title("Car Position (Actual vs Projected)")
+axs[1, 0].set_xlabel("Time")
+axs[1, 0].set_ylabel("Position")
+axs[1, 0].legend()
 
 # Create histogram x_data to match the shape of lane_histogram (half the width of the frame, e.g., 400)
 histogram_x_data = np.arange(400)
@@ -50,8 +80,11 @@ axs[1, 1].legend()
 # Function to update the charts
 def update_graphs(left_lane_pos, right_lane_pos, histogram_left, histogram_right):
     # Ensure the lane positions are non-negative
-    left_lane_pos = max(0, left_lane_pos)
-    right_lane_pos = max(0, right_lane_pos)
+    if left_lane_pos == 0 or right_lane_pos == 0:
+        return
+
+    left_lane_pos = abs(400 - max(0, left_lane_pos))
+    right_lane_pos = abs(400 - max(0, right_lane_pos))
 
     # Shift data for real-time updates
     left_lane_data[:-1] = left_lane_data[1:]
@@ -62,13 +95,30 @@ def update_graphs(left_lane_pos, right_lane_pos, histogram_left, histogram_right
     left_hist_line.set_ydata(histogram_left)
     right_hist_line.set_ydata(histogram_right)
 
+    adjustment_data[:-1] = adjustment_data[1:]
+    adjustment_data[-1] = -1 * update_steering(right_lane_pos, left_lane_pos, pid_controller, dt)
+
+    error = right_lane_data - left_lane_data
+    error_line.set_ydata(error)
+    adjustment_line.set_ydata(adjustment_data)
+
     # Update line plots with new data
     left_line.set_ydata(left_lane_data)
     right_line.set_ydata(right_lane_data)
 
+    # Update actual and projected car position
+    actual_car_line.set_ydata(error/2)
+    projected_car_line.set_ydata(error + adjustment_data)
+    saveChart(projected_car_line,"look_ahead.csv")
     # Rescale the axes automatically
     axs[0, 0].relim()
     axs[0, 0].autoscale_view()
+    
+    axs[0, 1].relim()
+    axs[0, 1].autoscale_view()
+
+    axs[1, 0].relim()
+    axs[1, 0].autoscale_view()
     
     axs[1, 1].relim()
     axs[1, 1].autoscale_view()
@@ -85,7 +135,7 @@ while is_frame_available:
     resized_frame = cv2.resize(frame_image, (800, 600))  # Change frame size to 800x600
 
     # Defining points for perspective transformation (adjusted for the new size)
-    top_left = (200, 334)  # Adjusted to match new frame size
+    top_left = (250, 334)  # Adjusted to match new frame size
     bottom_left = (0, 500)
     top_right = (570, 334)
     bottom_right = (800, 500)
