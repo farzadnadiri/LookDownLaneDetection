@@ -1,6 +1,7 @@
 # Look Down Lane Detection in Self-Driving Cars
 
 This repository contains the implementation of the "Look Down Method" for lane detection in self-driving cars. The project captures video frames, removes unnecessary data, and performs lane detection using masking and filtering techniques provided by OpenCV.
+
 [![Watch the video](https://img.youtube.com/vi/TuawiVMbt_c/0.jpg)](https://www.youtube.com/watch?v=TuawiVMbt_c)
 
 ## Table of Contents
